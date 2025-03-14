@@ -26,6 +26,7 @@ setInterval(() => {
 exports.authController = {
     async login(req, res) {
         const { username, password } = req.body;
+        console.log(req.body);
         const ipAddress = (req.ip || 'unknown-ip');
         // Runtime type checking
         if (!(0, typeGuards_1.isString)(username) || !(0, typeGuards_1.isString)(password)) {
@@ -44,6 +45,7 @@ exports.authController = {
                 }
             }
             const users = await (0, db_1.executeQuery)('SELECT * FROM users WHERE username = ?', [username]);
+            console.log(users);
             const user = users[0];
             if (!user || !(await bcryptjs_1.default.compare(password, user.password))) {
                 // Track failed attempt

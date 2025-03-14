@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import React, { useEffect, useState, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import styled from '@emotion/styled';
 import { Submission, ResourceType } from '../types';
 import { submissionService } from '../services/submissionService';
@@ -24,12 +24,43 @@ const FilterContainer = styled.div`
   flex-wrap: wrap;
 `;
 
+const SearchContainer = styled.div`
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+`;
+
 const SearchInput = styled.input`
   padding: 0.5rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   flex: 1;
   min-width: 200px;
+`;
+
+const SuggestionsList = styled.ul`
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+`;
+
+const SuggestionItem = styled.li`
+  padding: 8px 12px;
+  cursor: pointer;
+  &:hover {
+    background: #f5f5f5;
+  }
 `;
 
 const Select = styled.select`
@@ -47,6 +78,70 @@ const ErrorMessage = styled.div`
   border-radius: 4px;
 `;
 
+const ResourceList = styled.div`
+  margin-top: 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 1rem;
+`;
+
+const ResourceCard = styled.div`
+  padding: 1rem;
+  border-bottom: 1px solid #eee;
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const ClickableResourceCard = styled(ResourceCard)`
+  cursor: pointer;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: #f5f5f5;
+  }
+`;
+
+const ResourceHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+`;
+
+const ResourceTypeLabel = styled.span`
+  font-weight: bold;
+  color: #2c3e50;
+`;
+
+const ResourceAddress = styled.p`
+  margin: 0.5rem 0;
+  color: #34495e;
+`;
+
+const ResourceDescription = styled.p`
+  margin: 0.5rem 0;
+  color: #7f8c8d;
+`;
+
+const ResourceContact = styled.p`
+  margin: 0.5rem 0;
+  color: #16a085;
+  font-style: italic;
+`;
+
+// Add MapController component for programmatic map control
+const MapController: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [center, zoom, map]);
+  
+  return null;
+};
+
 interface MapViewProps {
   center?: [number, number];
   zoom?: number;
@@ -59,6 +154,12 @@ export const MapView: React.FC<MapViewProps> = ({
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [filteredSubmissions, setFilteredSubmissions] = useState<Submission[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [mapCenter, setMapCenter] = useState(center);
+  const [mapZoom, setMapZoom] = useState(zoom);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [filters, setFilters] = useState({
     search: '',
     resourceType: '',
@@ -80,6 +181,34 @@ export const MapView: React.FC<MapViewProps> = ({
 
     fetchSubmissions();
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      const newSuggestions = submissions
+        .filter(submission => 
+          submission.description.toLowerCase().includes(searchLower) ||
+          submission.address.toLowerCase().includes(searchLower)
+        )
+        .map(submission => submission.description)
+        .filter((value, index, self) => self.indexOf(value) === index)
+        .slice(0, 5);
+      setSuggestions(newSuggestions);
+    } else {
+      setSuggestions([]);
+    }
+  }, [filters.search, submissions]);
 
   useEffect(() => {
     const filtered = submissions.filter(submission => {
@@ -108,6 +237,25 @@ export const MapView: React.FC<MapViewProps> = ({
       ...prev,
       [name]: value
     }));
+    if (name === 'search') {
+      setShowSuggestions(true);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setFilters(prev => ({
+      ...prev,
+      search: suggestion
+    }));
+    setShowSuggestions(false);
+  };
+
+  const handleResourceClick = (submission: Submission) => {
+    if (submission.latitude && submission.longitude) {
+      setSelectedSubmission(submission);
+      setMapCenter([submission.latitude, submission.longitude]);
+      setMapZoom(16);
+    }
   };
 
   if (error) {
@@ -117,13 +265,28 @@ export const MapView: React.FC<MapViewProps> = ({
   return (
     <>
       <FilterContainer>
-        <SearchInput
-          type="text"
-          name="search"
-          placeholder="Search by description or address..."
-          value={filters.search}
-          onChange={handleFilterChange}
-        />
+        <SearchContainer ref={searchContainerRef}>
+          <SearchInput
+            type="text"
+            name="search"
+            placeholder="Search by description or address..."
+            value={filters.search}
+            onChange={handleFilterChange}
+            onFocus={() => setShowSuggestions(true)}
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <SuggestionsList>
+              {suggestions.map((suggestion, index) => (
+                <SuggestionItem
+                  key={index}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  {suggestion}
+                </SuggestionItem>
+              ))}
+            </SuggestionsList>
+          )}
+        </SearchContainer>
 
         <Select
           name="resourceType"
@@ -155,6 +318,7 @@ export const MapView: React.FC<MapViewProps> = ({
           zoom={zoom} 
           style={{ height: '100%', width: '100%' }}
         >
+          <MapController center={mapCenter} zoom={mapZoom} />
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -176,6 +340,33 @@ export const MapView: React.FC<MapViewProps> = ({
           ))}
         </MapContainer>
       </MapWrapper>
+
+      <ResourceList>
+        <h2>Available Resources ({filteredSubmissions.length})</h2>
+        {filteredSubmissions.map((submission) => (
+          <ClickableResourceCard 
+            key={submission.id}
+            onClick={() => handleResourceClick(submission)}
+          >
+            <ResourceHeader>
+              <ResourceTypeLabel>
+                {submission.resource_type.replace('_', ' ').toUpperCase()}
+              </ResourceTypeLabel>
+              {submission.verified_at && (
+                <span>Verified: {new Date(submission.verified_at).toLocaleDateString()}</span>
+              )}
+            </ResourceHeader>
+            <ResourceAddress>{submission.address} ({submission.zip_code})</ResourceAddress>
+            <ResourceDescription>{submission.description}</ResourceDescription>
+            {submission.contact_info && (
+              <ResourceContact>Contact: {submission.contact_info}</ResourceContact>
+            )}
+          </ClickableResourceCard>
+        ))}
+        {filteredSubmissions.length === 0 && (
+          <p>No resources found matching your filters.</p>
+        )}
+      </ResourceList>
     </>
   );
 };

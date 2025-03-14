@@ -1,4 +1,3 @@
-/*
 import { Request, Response, NextFunction } from 'express';
 import sanitize from 'sanitize-html';
 import { AppError } from './errorHandler';
@@ -20,7 +19,12 @@ function deepSanitize(obj: any): any {
   if (typeof obj === 'object') {
     const sanitized: any = {};
     for (const [key, value] of Object.entries(obj)) {
-      sanitized[key] = deepSanitize(value);
+      // Skip password fields completely
+      if (key === 'password') {
+        sanitized[key] = value;
+      } else {
+        sanitized[key] = deepSanitize(value);
+      }
     }
     return sanitized;
   }
@@ -34,17 +38,9 @@ function deepSanitize(obj: any): any {
 
 export const sanitizeInputs = (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Skip password sanitization for authentication routes
-    const isAuthRoute = req.path.startsWith('/auth/');
-    
     // Sanitize body
     if (req.body) {
-      const sanitizedBody = deepSanitize(req.body);
-      // Preserve password for auth routes
-      if (isAuthRoute && req.body.password) {
-        sanitizedBody.password = req.body.password;
-      }
-      req.body = sanitizedBody;
+      req.body = deepSanitize(req.body);
     }
 
     // Sanitize query parameters
@@ -62,5 +58,4 @@ export const sanitizeInputs = (req: Request, res: Response, next: NextFunction) 
     console.error('Input sanitization error:', error);
     next(new AppError(400, 'Invalid input data'));
   }
-};
-*/
+}

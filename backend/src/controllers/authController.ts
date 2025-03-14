@@ -44,7 +44,6 @@ export const authController = {
         if (Date.now() - attempts.firstAttempt < LOGIN_WINDOW) {
           throw new AppError(429, 'Too many login attempts. Please try again later.');
         } else {
-          // Reset if window has expired
           loginAttempts.delete(ipAddress);
         }
       }
@@ -55,13 +54,30 @@ export const authController = {
       );
 
       const user = users[0];
-      if (!user || !(await bcrypt.compare(password, user.password))) {
-        // Track failed attempt
+
+      if (!user) {
+        // Track failed attempt for non-existent user
         loginAttempts.set(ipAddress, {
           count: attempts.count + 1,
           firstAttempt: attempts.firstAttempt
         });
-        
+        throw new AppError(401, 'Invalid username or password');
+      }
+
+      const hashedEnteredPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
+      console.log('hashedEnteredPassword:', hashedEnteredPassword);
+
+      const dbUserPassword = user.password;
+
+      console.log('dbUserPassword', dbUserPassword);
+      const passwordMatches = await bcrypt.compare(password, user.password);
+      
+      if (!passwordMatches) {
+        // Track failed attempt for wrong password
+        loginAttempts.set(ipAddress, {
+          count: attempts.count + 1,
+          firstAttempt: attempts.firstAttempt
+        });
         throw new AppError(401, 'Invalid username or password');
       }
 
