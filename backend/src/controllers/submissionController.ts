@@ -1,15 +1,12 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { executeQuery } from '../utils/db';
 import { ResourceType, Submission, SubmissionStatus } from '../types';
-import { geocodeAddress } from '../services/geocodingService';
 import { AppError } from '../middlewares/errorHandler';
 import { 
   isString, 
   isResourceType, 
   isSubmissionStatus,
-  isValidZipCode,
-  isValidLatitude,
-  isValidLongitude 
+  isValidZipCode
 } from '../utils/typeGuards';
 
 interface SubmissionRow extends Submission {
@@ -47,7 +44,6 @@ export const submissionController = {
     const { address, zip_code, resource_type, description, contact_info } = req.body;
     const userId = req.user?.id;
 
-    // Runtime type checking
     if (!isString(address)) {
       throw new AppError(400, 'Address must be a string');
     }
@@ -65,22 +61,10 @@ export const submissionController = {
     }
 
     try {
-      // Geocode the address
-      const location = await geocodeAddress(address, zip_code);
-      
-      if (!location) {
-        throw new AppError(400, 'Could not geocode address. Please verify the address is correct.');
-      }
-
-      // Validate geocoded coordinates
-      if (!isValidLatitude(location.lat) || !isValidLongitude(location.lon)) {
-        throw new AppError(500, 'Received invalid coordinates from geocoding service');
-      }
-
       const result = await executeQuery<{ insertId: number }>(
         `INSERT INTO submissions 
-         (address, zip_code, resource_type, description, contact_info, status, latitude, longitude, submitted_by) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (address, zip_code, resource_type, description, contact_info, status, submitted_by) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           address, 
           zip_code, 
@@ -88,8 +72,6 @@ export const submissionController = {
           description, 
           contact_info || null, 
           SubmissionStatus.PENDING,
-          location.lat,
-          location.lon,
           userId || null
         ]
       );
@@ -108,18 +90,16 @@ export const submissionController = {
     const { id } = req.params;
     const { status } = req.body;
 
-    // Runtime type checking
     if (!isSubmissionStatus(status)) {
       throw new AppError(400, 'Invalid submission status');
     }
 
     try {
-      // First check if submission exists
       const existing = await executeQuery<SubmissionRow[]>(
         'SELECT id FROM submissions WHERE id = ?',
         [id]
       );
-
+      
       if (!existing.length) {
         throw new AppError(404, 'Submission not found');
       }
@@ -136,6 +116,135 @@ export const submissionController = {
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError(500, 'Failed to update submission status');
+    }
+  },
+
+  async createBulkSubmissions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const submissions = req.body;
+      
+      if (!Array.isArray(submissions)) {
+        return res.status(400).json({ error: 'Request body must be an array of submissions' });
+      }
+
+      const requiredFields = ['address', 'zip_code', 'resource_type', 'description'];
+      const failedSubmissions: { index: number; address: string; reason: string }[] = [];
+      const successfulResults: any[] = [];
+      
+      submissions.forEach((submission, index) => {
+        try {
+          const missingFields = requiredFields.filter(field => !submission[field]);
+          if (missingFields.length > 0) {
+            failedSubmissions.push({
+              index,
+              address: submission.address || 'N/A',
+              reason: `Missing required fields: ${missingFields.join(', ')}`
+            });
+            return;
+          }
+
+          if (!isString(submission.address)) {
+            failedSubmissions.push({
+              index,
+              address: String(submission.address) || 'N/A',
+              reason: 'Address must be a string'
+            });
+            return;
+          }
+
+          if (!isValidZipCode(submission.zip_code)) {
+            failedSubmissions.push({
+              index,
+              address: submission.address,
+              reason: 'Invalid zip code format. Must be 5 digits or 5+4 format'
+            });
+            return;
+          }
+
+          if (!isResourceType(submission.resource_type)) {
+            failedSubmissions.push({
+              index,
+              address: submission.address,
+              reason: `Invalid resource type. Must be one of: ${Object.values(ResourceType).join(', ')}`
+            });
+            return;
+          }
+
+          if (!isString(submission.description)) {
+            failedSubmissions.push({
+              index,
+              address: submission.address,
+              reason: 'Description must be a string'
+            });
+            return;
+          }
+
+          if (submission.contact_info !== undefined && !isString(submission.contact_info)) {
+            failedSubmissions.push({
+              index,
+              address: submission.address,
+              reason: 'Contact info must be a string if provided'
+            });
+            return;
+          }
+          
+          successfulResults.push({
+            address: submission.address,
+            zip_code: submission.zip_code,
+            resource_type: submission.resource_type,
+            description: submission.description,
+            contact_info: submission.contact_info || null,
+            status: SubmissionStatus.PENDING,
+            submitted_by: null
+          });
+        } catch (error) {
+          console.error('Error processing submission:', error);
+          failedSubmissions.push({
+            index,
+            address: submission.address || 'N/A',
+            reason: error instanceof Error ? error.message : 'Unexpected error processing submission'
+          });
+        }
+      });
+
+      if (successfulResults.length === 0) {
+        return res.status(400).json({
+          message: 'No submissions were successful',
+          failedSubmissions
+        });
+      }
+  
+      const values = successfulResults.map(result => [
+        result.address,
+        result.zip_code,
+        result.resource_type,
+        result.description,
+        result.contact_info,
+        result.status,
+        result.submitted_by
+      ]);
+
+      try {
+        const insertQuery = `
+          INSERT INTO submissions 
+          (address, zip_code, resource_type, description, contact_info, status, submitted_by)
+          VALUES ?
+        `;
+        await executeQuery(insertQuery, [values]);
+
+        res.status(201).json({
+          message: 'Bulk submissions processed',
+          successful: successfulResults.length,
+          failed: failedSubmissions.length,
+          failedSubmissions: failedSubmissions
+        });
+      } catch (dbError) {
+        console.error('Database insertion error:', dbError);
+        throw new AppError(500, 'Failed to save successful submissions to database');
+      }
+    } catch (error) {
+      console.error('Bulk submission error:', error);
+      next(new AppError(500, 'Failed to process bulk submissions'));
     }
   }
 };

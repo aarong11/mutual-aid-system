@@ -2,6 +2,7 @@
   "name": "mutual-aid-app",
   "version": "1.0.0",
   "description": "Community mutual aid resource mapping application",
+  "license": "GPL-3.0",
   "scripts": {
     "install-all": "npm install && cd frontend && npm install && cd ../backend && npm install",
     "frontend": "cd frontend && npm start",

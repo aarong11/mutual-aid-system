@@ -92,3 +92,22 @@ export const authValidation = {
       .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
   ]
 };
+
+export const validateBulkSubmissions = [
+  body().isArray().withMessage('Request body must be an array of submissions'),
+  body('*.address').trim().notEmpty().withMessage('Address is required'),
+  body('*.zip_code')
+    .matches(/^\d{5}(-\d{4})?$/)
+    .withMessage('ZIP code must be in format: 12345 or 12345-6789'),
+  body('*.resource_type')
+    .isIn(Object.values(ResourceType))
+    .withMessage('Resource type must be a valid resource type'),
+  body('*.description')
+    .trim()
+    .notEmpty()
+    .withMessage('Description is required'),
+  body('*.contact_info')
+    .trim()
+    .notEmpty()
+    .withMessage('Contact information is required')
+];

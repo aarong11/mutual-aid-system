@@ -19,8 +19,8 @@ const app = (0, express_1.default)();
 const port = process.env.PORT || 3002;
 let server;
 // Body parsing middleware - must be before other middleware that needs the body
-app.use(express_1.default.json({ limit: '10kb' }));
-app.use(express_1.default.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express_1.default.json({ limit: '10mb' }));
+app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 // Global timeout (15 seconds)
 app.use((0, timeout_1.requestTimeout)(15000));
 // Request logging
@@ -35,7 +35,7 @@ app.use((0, helmet_1.default)({
             scriptSrc: ["'self'", "'unsafe-inline'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "https://nominatim.openstreetmap.org"]
+            connectSrc: ["'self'", "https://api.geoapify.com"]
         }
     },
     crossOriginEmbedderPolicy: false,

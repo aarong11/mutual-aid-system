@@ -1,7 +1,7 @@
 import express from 'express';
 import { submissionController } from '../controllers/submissionController';
 import { authenticateCoordinator } from '../middlewares/auth';
-import { submissionValidation } from '../middlewares/validation';
+import { submissionValidation, validateBulkSubmissions } from '../middlewares/validation';
 import { handleValidation } from '../middlewares/validationHandler';
 
 const router = express.Router();
@@ -25,6 +25,14 @@ router.patch('/:id',
   submissionValidation.updateStatus,
   handleValidation,
   submissionController.updateSubmissionStatus
+);
+
+// Bulk submission route (coordinator only)
+router.post('/bulk', 
+  authenticateCoordinator,
+  validateBulkSubmissions,
+  handleValidation,
+  submissionController.createBulkSubmissions
 );
 
 export default router;

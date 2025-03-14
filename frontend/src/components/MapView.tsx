@@ -1,8 +1,28 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+/*
+ * This file is part of the aid project.
+ * Copyright (C) 2024 
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import styled from '@emotion/styled';
 import { Submission, ResourceType } from '../types';
 import { submissionService } from '../services/submissionService';
+import { geocodingService } from '../services/geocodingService';
+import { getMarkerIcon } from '../utils/markerIcons';
 import 'leaflet/dist/leaflet.css';
 
 const MapWrapper = styled.div`
@@ -142,6 +162,19 @@ const MapController: React.FC<{ center: [number, number]; zoom: number }> = ({ c
   return null;
 };
 
+const LoadingOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
 interface MapViewProps {
   center?: [number, number];
   zoom?: number;
@@ -165,6 +198,61 @@ export const MapView: React.FC<MapViewProps> = ({
     resourceType: '',
     zipCode: ''
   });
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodingErrors, setGeocodingErrors] = useState<{[key: string]: string}>({});
+  const [markerPositions, setMarkerPositions] = useState<{[key: string]: [number, number]}>({});
+  // Track which submissions should have visible markers
+  const [visibleMarkers, setVisibleMarkers] = useState<Set<number>>(new Set());
+
+  const handleResourceClick = async (submission: Submission) => {
+    if (!submission.id) return;
+    
+    setSelectedSubmission(submission);
+    
+    if (!submission.latitude || !submission.longitude) {
+      setIsGeocoding(true);
+      try {
+        const coords = await geocodingService.geocodeAddress(submission.address);
+        if (coords) {
+          setMapCenter(coords);
+          setMapZoom(16);
+          setMarkerPositions(prev => ({
+            ...prev,
+            [submission.id!]: coords
+          }));
+          // Add the submission to visible markers
+          setVisibleMarkers(prev => new Set([...prev, submission.id!]));
+          // Clear any previous error for this address
+          setGeocodingErrors(prev => {
+            const next = { ...prev };
+            delete next[submission.address];
+            return next;
+          });
+        } else {
+          setGeocodingErrors(prev => ({
+            ...prev,
+            [submission.address]: 'Could not find coordinates for this address'
+          }));
+        }
+      } catch (error) {
+        setGeocodingErrors(prev => ({
+          ...prev,
+          [submission.address]: error instanceof Error ? error.message : 'Failed to geocode address'
+        }));
+      } finally {
+        setIsGeocoding(false);
+      }
+    } else {
+      setMapCenter([submission.latitude, submission.longitude]);
+      setMapZoom(16);
+      setMarkerPositions(prev => ({
+        ...prev,
+        [submission.id!]: [submission.latitude!, submission.longitude!]
+      }));
+      // Add the submission to visible markers
+      setVisibleMarkers(prev => new Set([...prev, submission.id!]));
+    }
+  };
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -213,8 +301,7 @@ export const MapView: React.FC<MapViewProps> = ({
   useEffect(() => {
     const filtered = submissions.filter(submission => {
       const matchesSearch = filters.search
-        ? submission.description.toLowerCase().includes(filters.search.toLowerCase()) ||
-          submission.address.toLowerCase().includes(filters.search.toLowerCase())
+        ? submission.address.toLowerCase().includes(filters.search.toLowerCase())
         : true;
 
       const matchesType = filters.resourceType
@@ -248,14 +335,6 @@ export const MapView: React.FC<MapViewProps> = ({
       search: suggestion
     }));
     setShowSuggestions(false);
-  };
-
-  const handleResourceClick = (submission: Submission) => {
-    if (submission.latitude && submission.longitude) {
-      setSelectedSubmission(submission);
-      setMapCenter([submission.latitude, submission.longitude]);
-      setMapZoom(16);
-    }
   };
 
   if (error) {
@@ -323,11 +402,14 @@ export const MapView: React.FC<MapViewProps> = ({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
-          {filteredSubmissions.map((submission) => (
-            submission.latitude && submission.longitude && (
+          {filteredSubmissions.map((submission) => {
+            if (!submission.id || !visibleMarkers.has(submission.id)) return null;
+            const position = markerPositions[String(submission.id)];
+            return position && (
               <Marker 
                 key={submission.id} 
-                position={[submission.latitude, submission.longitude]}
+                position={position}
+                icon={getMarkerIcon(submission.resource_type)}
               >
                 <Popup>
                   <h3>{submission.resource_type.replace('_', ' ').toUpperCase()}</h3>
@@ -336,9 +418,14 @@ export const MapView: React.FC<MapViewProps> = ({
                   {submission.contact_info && <p>Contact: {submission.contact_info}</p>}
                 </Popup>
               </Marker>
-            )
-          ))}
+            );
+          })}
         </MapContainer>
+        {isGeocoding && (
+          <LoadingOverlay>
+            <p>Loading location data...</p>
+          </LoadingOverlay>
+        )}
       </MapWrapper>
 
       <ResourceList>
@@ -360,6 +447,9 @@ export const MapView: React.FC<MapViewProps> = ({
             <ResourceDescription>{submission.description}</ResourceDescription>
             {submission.contact_info && (
               <ResourceContact>Contact: {submission.contact_info}</ResourceContact>
+            )}
+            {geocodingErrors[submission.address] && (
+              <ErrorMessage>{geocodingErrors[submission.address]}</ErrorMessage>
             )}
           </ClickableResourceCard>
         ))}

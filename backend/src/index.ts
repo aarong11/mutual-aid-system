@@ -18,8 +18,8 @@ const port = process.env.PORT || 3002;
 let server: Server;
 
 // Body parsing middleware - must be before other middleware that needs the body
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Global timeout (15 seconds)
 app.use(requestTimeout(15000));
@@ -37,7 +37,7 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://nominatim.openstreetmap.org"]
+      connectSrc: ["'self'", "https://api.geoapify.com"]
     }
   },
   crossOriginEmbedderPolicy: false,
@@ -45,7 +45,7 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN,
+  origin: '*',
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']

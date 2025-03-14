@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authValidation = exports.submissionValidation = void 0;
+exports.validateBulkSubmissions = exports.authValidation = exports.submissionValidation = void 0;
 const express_validator_1 = require("express-validator");
 const types_1 = require("../types");
 exports.submissionValidation = {
@@ -83,3 +83,21 @@ exports.authValidation = {
             .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
     ]
 };
+exports.validateBulkSubmissions = [
+    (0, express_validator_1.body)().isArray().withMessage('Request body must be an array of submissions'),
+    (0, express_validator_1.body)('*.address').trim().notEmpty().withMessage('Address is required'),
+    (0, express_validator_1.body)('*.zip_code')
+        .matches(/^\d{5}(-\d{4})?$/)
+        .withMessage('ZIP code must be in format: 12345 or 12345-6789'),
+    (0, express_validator_1.body)('*.resource_type')
+        .isIn(Object.values(types_1.ResourceType))
+        .withMessage('Resource type must be a valid resource type'),
+    (0, express_validator_1.body)('*.description')
+        .trim()
+        .notEmpty()
+        .withMessage('Description is required'),
+    (0, express_validator_1.body)('*.contact_info')
+        .trim()
+        .notEmpty()
+        .withMessage('Contact information is required')
+];

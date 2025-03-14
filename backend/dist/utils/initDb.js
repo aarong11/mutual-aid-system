@@ -99,7 +99,7 @@ async function initializeDatabase(attempt = 1) {
             const testCoordinator = {
                 username: 'coordinator',
                 // In production, this should be randomly generated and securely communicated
-                password: '$2a$10$xk9kM9qvn8RyKxQX9VZ0W.1wz9hH9GMX.ZTzwjV0F0jW7TpX8ZjI2', // "password123"
+                password: '$2a$12$lYcEjzm7hNvLXPwmNUbd7uNFppmZ2kkCC4Zl575.6XDsrHfJ9c09u', // "password123"
                 email: 'coordinator@example.com',
                 role: 'coordinator'
             };

@@ -1,86 +1,85 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import styled from '@emotion/styled';
-import { Global } from '@emotion/react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from '@emotion/react';
 import { Navigation } from './components/Navigation';
 import { MapView } from './components/MapView';
-import { SubmissionForm } from './components/SubmissionForm';
-import { CoordinatorDashboard } from './components/CoordinatorDashboard';
 import { Login } from './pages/Login';
-import { globalStyles } from './styles/global';
-import ErrorBoundary from './components/ErrorBoundary';
+import { CsvUpload } from './pages/CsvUpload';
+import { CoordinatorDashboard } from './components/CoordinatorDashboard';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { theme } from './styles/global';
+import styled from '@emotion/styled';
 
 const AppContainer = styled.div`
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
   background-color: #f5f6fa;
 `;
 
-const Header = styled.header`
-  background-color: #2c3e50;
-  color: white;
-  padding: 1rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-`;
-
-const Main = styled.main`
-  flex: 1;
-  width: 100%;
+const ContentContainer = styled.main`
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
-  box-sizing: border-box;
 `;
 
 // Protected route component
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isCoordinator, token } = useAuth();
-  
+const ProtectedRoute: React.FC<{ 
+  children: React.ReactNode;
+  requireCoordinator?: boolean;
+}> = ({ children, requireCoordinator = false }) => {
+  const { token, isCoordinator } = useAuth();
+
   if (!token) {
-    return <Navigate to="/login" state={{ from: window.location.pathname }} />;
+    return <Navigate to="/login" replace />;
   }
-  
-  if (!isCoordinator) {
-    return <Navigate to="/" />;
+
+  if (requireCoordinator && !isCoordinator) {
+    return <Navigate to="/" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
-const AppContent: React.FC = () => {
+const AppRoutes: React.FC = () => {
   return (
-    <AppContainer>
-      <ErrorBoundary>
-        <Navigation />
-        <Main>
-          <Routes>
-            <Route path="/" element={<MapView />} />
-            <Route path="/submit" element={<SubmissionForm />} />
-            <Route path="/login" element={<Login />} />
-            <Route 
-              path="/coordinator" 
-              element={
-                <ProtectedRoute>
-                  <CoordinatorDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Main>
-      </ErrorBoundary>
-    </AppContainer>
+    <Routes>
+      <Route path="/" element={<MapView />} />
+      <Route path="/login" element={<Login />} />
+      <Route 
+        path="/csv-upload" 
+        element={
+          <ProtectedRoute requireCoordinator>
+            <CsvUpload />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/coordinator" 
+        element={
+          <ProtectedRoute requireCoordinator>
+            <CoordinatorDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <Global styles={globalStyles} />
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider theme={theme}>
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppContainer>
+            <Navigation />
+            <ContentContainer>
+              <AppRoutes />
+            </ContentContainer>
+          </AppContainer>
+        </AuthProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 };
 

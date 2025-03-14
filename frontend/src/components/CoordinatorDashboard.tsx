@@ -124,7 +124,10 @@ export const CoordinatorDashboard: React.FC = () => {
     }
   };
 
-  const handleStatusUpdate = async (submissionId: number, status: SubmissionStatus) => {
+  const handleStatusUpdate = async (
+    submissionId: number, 
+    status: SubmissionStatus.VERIFIED | SubmissionStatus.REJECTED
+  ) => {
     try {
       await submissionService.updateSubmissionStatus(submissionId, status);
       await fetchPendingSubmissions();

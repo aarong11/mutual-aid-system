@@ -82,9 +82,14 @@ export const Navigation: React.FC = () => {
             Submit Resource
           </StyledNavLink>
           {isCoordinator && (
-            <StyledNavLink to="/coordinator" active={location.pathname === '/coordinator'}>
-              Review Submissions
-            </StyledNavLink>
+            <>
+              <StyledNavLink to="/coordinator" active={location.pathname === '/coordinator'}>
+                Review Submissions
+              </StyledNavLink>
+              <StyledNavLink to="/csv-upload" active={location.pathname === '/csv-upload'}>
+                Upload CSV
+              </StyledNavLink>
+            </>
           )}
           {token ? (
             <>

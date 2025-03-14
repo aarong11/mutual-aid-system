@@ -15,4 +15,6 @@ router.post('/', validation_1.submissionValidation.create, validationHandler_1.h
 // Protected routes (coordinator only)
 router.get('/pending', auth_1.authenticateCoordinator, submissionController_1.submissionController.getPendingSubmissions);
 router.patch('/:id', auth_1.authenticateCoordinator, validation_1.submissionValidation.updateStatus, validationHandler_1.handleValidation, submissionController_1.submissionController.updateSubmissionStatus);
+// Bulk submission route (coordinator only)
+router.post('/bulk', auth_1.authenticateCoordinator, validation_1.validateBulkSubmissions, validationHandler_1.handleValidation, submissionController_1.submissionController.createBulkSubmissions);
 exports.default = router;

@@ -1,67 +1,60 @@
 "use strict";
-/*
-import { Request, Response, NextFunction } from 'express';
-import sanitize from 'sanitize-html';
-import { AppError } from './errorHandler';
-
-const sanitizeOptions: sanitize.IOptions = {
-  allowedTags: [], // No HTML tags allowed
-  allowedAttributes: {}, // No HTML attributes allowed
-  disallowedTagsMode: 'recursiveEscape' as sanitize.DisallowedTagsModes
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sanitizeInputs = void 0;
+const sanitize_html_1 = __importDefault(require("sanitize-html"));
+const errorHandler_1 = require("./errorHandler");
+const sanitizeOptions = {
+    allowedTags: [], // No HTML tags allowed
+    allowedAttributes: {}, // No HTML attributes allowed
+    disallowedTagsMode: 'recursiveEscape'
+};
 // Helper to deeply sanitize an object's string values
-function deepSanitize(obj: any): any {
-  if (!obj) return obj;
-  
-  if (Array.isArray(obj)) {
-    return obj.map(item => deepSanitize(item));
-  }
-  
-  if (typeof obj === 'object') {
-    const sanitized: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      sanitized[key] = deepSanitize(value);
+function deepSanitize(obj) {
+    if (!obj)
+        return obj;
+    if (Array.isArray(obj)) {
+        return obj.map(item => deepSanitize(item));
     }
-    return sanitized;
-  }
-  
-  if (typeof obj === 'string') {
-    return sanitize(obj, sanitizeOptions);
-  }
-  
-  return obj;
+    if (typeof obj === 'object') {
+        const sanitized = {};
+        for (const [key, value] of Object.entries(obj)) {
+            // Skip password fields completely
+            if (key === 'password') {
+                sanitized[key] = value;
+            }
+            else {
+                sanitized[key] = deepSanitize(value);
+            }
+        }
+        return sanitized;
+    }
+    if (typeof obj === 'string') {
+        return (0, sanitize_html_1.default)(obj, sanitizeOptions);
+    }
+    return obj;
 }
-
-export const sanitizeInputs = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Skip password sanitization for authentication routes
-    const isAuthRoute = req.path.startsWith('/auth/');
-    
-    // Sanitize body
-    if (req.body) {
-      const sanitizedBody = deepSanitize(req.body);
-      // Preserve password for auth routes
-      if (isAuthRoute && req.body.password) {
-        sanitizedBody.password = req.body.password;
-      }
-      req.body = sanitizedBody;
+const sanitizeInputs = (req, res, next) => {
+    try {
+        // Sanitize body
+        if (req.body) {
+            req.body = deepSanitize(req.body);
+        }
+        // Sanitize query parameters
+        if (req.query) {
+            req.query = deepSanitize(req.query);
+        }
+        // Sanitize URL parameters
+        if (req.params) {
+            req.params = deepSanitize(req.params);
+        }
+        next();
     }
-
-    // Sanitize query parameters
-    if (req.query) {
-      req.query = deepSanitize(req.query);
+    catch (error) {
+        console.error('Input sanitization error:', error);
+        next(new errorHandler_1.AppError(400, 'Invalid input data'));
     }
-
-    // Sanitize URL parameters
-    if (req.params) {
-      req.params = deepSanitize(req.params);
-    }
-
-    next();
-  } catch (error) {
-    console.error('Input sanitization error:', error);
-    next(new AppError(400, 'Invalid input data'));
-  }
 };
-*/ 
+exports.sanitizeInputs = sanitizeInputs;

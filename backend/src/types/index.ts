@@ -19,7 +19,7 @@ export enum UserRole {
 }
 
 export interface Submission {
-  id?: number;
+  id: number;
   address: string;
   zip_code: string;
   resource_type: ResourceType;
@@ -28,7 +28,7 @@ export interface Submission {
   latitude?: number;
   longitude?: number;
   status: SubmissionStatus;
-  submitted_at?: Date;
+  submitted_at: Date;
   verified_at?: Date;
   submitted_by?: number;
 }

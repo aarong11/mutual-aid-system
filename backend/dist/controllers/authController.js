@@ -26,7 +26,6 @@ setInterval(() => {
 exports.authController = {
     async login(req, res) {
         const { username, password } = req.body;
-        console.log(req.body);
         const ipAddress = (req.ip || 'unknown-ip');
         // Runtime type checking
         if (!(0, typeGuards_1.isString)(username) || !(0, typeGuards_1.isString)(password)) {
@@ -40,15 +39,26 @@ exports.authController = {
                     throw new errorHandler_1.AppError(429, 'Too many login attempts. Please try again later.');
                 }
                 else {
-                    // Reset if window has expired
                     loginAttempts.delete(ipAddress);
                 }
             }
             const users = await (0, db_1.executeQuery)('SELECT * FROM users WHERE username = ?', [username]);
-            console.log(users);
             const user = users[0];
-            if (!user || !(await bcryptjs_1.default.compare(password, user.password))) {
-                // Track failed attempt
+            if (!user) {
+                // Track failed attempt for non-existent user
+                loginAttempts.set(ipAddress, {
+                    count: attempts.count + 1,
+                    firstAttempt: attempts.firstAttempt
+                });
+                throw new errorHandler_1.AppError(401, 'Invalid username or password');
+            }
+            const hashedEnteredPassword = await bcryptjs_1.default.hash(password, BCRYPT_WORK_FACTOR);
+            console.log('hashedEnteredPassword:', hashedEnteredPassword);
+            const dbUserPassword = user.password;
+            console.log('dbUserPassword', dbUserPassword);
+            const passwordMatches = await bcryptjs_1.default.compare(password, user.password);
+            if (!passwordMatches) {
+                // Track failed attempt for wrong password
                 loginAttempts.set(ipAddress, {
                     count: attempts.count + 1,
                     firstAttempt: attempts.firstAttempt

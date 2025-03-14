@@ -1,5 +1,21 @@
 import { css } from '@emotion/react';
 
+export const theme = {
+  colors: {
+    primary: '#3498db',
+    secondary: '#2c3e50',
+    background: '#f5f6fa',
+    text: '#2c3e50',
+    error: '#e74c3c',
+    success: '#2ecc71'
+  },
+  spacing: {
+    small: '0.5rem',
+    medium: '1rem',
+    large: '1.5rem'
+  }
+};
+
 export const globalStyles = css`
   * {
     margin: 0;
