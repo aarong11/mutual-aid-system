@@ -1,0 +1,21 @@
+{
+  "name": "mutual-aid-app",
+  "version": "1.0.0",
+  "description": "Community mutual aid resource mapping application",
+  "scripts": {
+    "install-all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "frontend": "cd frontend && npm start",
+    "backend": "cd backend && npm run dev",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "init-db": "cd backend && npm run init-db",
+    "initialize-project": "npm run install-all && npm run init-db",
+    "build": "concurrently \"cd frontend && npm run build\" \"cd backend && npm run build\"",
+    "start": "cd backend && npm start",
+    "test": "concurrently \"cd frontend && npm test\" \"cd backend && npm test\"",
+    "lint": "concurrently \"cd frontend && npm run lint\" \"cd backend && npm run lint\"",
+    "clean": "rm -rf frontend/build backend/dist node_modules frontend/node_modules backend/node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

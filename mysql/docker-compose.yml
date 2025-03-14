@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: mutual_aid_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:3002
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: mutual_aid_backend
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mysql
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=mutual_aid_user
+      - DB_PASSWORD=mutual_aid_pass
+      - DB_NAME=mutual_aid
+      - DB_PORT=3306
+
+  mysql:
+    image: mysql:8.0
+    container_name: mutual_aid_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: mutual_aid
+      MYSQL_USER: mutual_aid_user
+      MYSQL_PASSWORD: mutual_aid_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
+    command: --default-authentication-plugin=mysql_native_password

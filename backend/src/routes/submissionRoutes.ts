@@ -1,0 +1,30 @@
+import express from 'express';
+import { submissionController } from '../controllers/submissionController';
+import { authenticateCoordinator } from '../middlewares/auth';
+import { submissionValidation } from '../middlewares/validation';
+import { handleValidation } from '../middlewares/validationHandler';
+
+const router = express.Router();
+
+// Public routes
+router.get('/', submissionController.getVerifiedSubmissions);
+router.post('/', 
+  submissionValidation.create,
+  handleValidation,
+  submissionController.createSubmission
+);
+
+// Protected routes (coordinator only)
+router.get('/pending', 
+  authenticateCoordinator,
+  submissionController.getPendingSubmissions
+);
+
+router.patch('/:id', 
+  authenticateCoordinator,
+  submissionValidation.updateStatus,
+  handleValidation,
+  submissionController.updateSubmissionStatus
+);
+
+export default router;
